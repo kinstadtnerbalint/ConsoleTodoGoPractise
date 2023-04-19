@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -58,6 +59,19 @@ func getTodosByUser(db *gorm.DB, user *User) ([]Todo, error) {
 	var todos []Todo
 	result := db.Where("user_id = ?", user.ID).Find(&todos)
 	return todos, result.Error
+}
+
+func printYourTodos(db *gorm.DB, user *User) {
+	todos, err := getTodosByUser(db, user)
+	errorPanic(err)
+
+	if len(todos) == 0 {
+		fmt.Println("\nYou don't have any todos!")
+	}
+
+	for _, todo := range todos {
+		fmt.Println("\n" + strconv.Itoa(int(todo.ID)) + " - " + todo.Title)
+	}
 }
 
 func main() {
@@ -214,6 +228,83 @@ main:
 					db.Create(
 						&Todo{Title: title, Completed: false, Description: description, UserID: user.ID, User: *user})
 					break inner
+				case "4": // Delete tudu
+					printYourTodos(db, user)
+
+					fmt.Println("\nEnter todo ID to delete:")
+
+					var input string
+					_, err = fmt.Scanln(&input)
+					errorPanic(err)
+
+					todo := db.Where("id = ?", input).First(&Todo{})
+					if todo.Error != nil || todo == nil {
+						fmt.Println("\nInvalid todo ID!")
+					}
+					db.Delete(todo)
+					fmt.Println("\nTodo successfully deleted!")
+					break inner
+				case "5": // update tudu
+					printYourTodos(db, user)
+
+					fmt.Println("\nEnter todo ID to update:")
+					var input string
+					_, err = fmt.Scanln(&input)
+					errorPanic(err)
+
+					todo := db.Where("id = ?", input).First(&Todo{})
+					var updatable Todo
+					db.Where("id = ?", input).First(&updatable)
+					if todo.Error != nil || todo == nil {
+						fmt.Println("\nInvalid todo ID!")
+					}
+					input = ""
+					fmt.Println(`
+================
+1 - Title
+2 - Description
+3 - Completed
+
+0 - Exit
+================`)
+					_, err = fmt.Scanln(&input)
+					errorPanic(err)
+
+					switch input {
+					default:
+						break inner
+					case "1":
+						var newTitle string
+						fmt.Println("\nEnter new title:")
+						_, err = fmt.Scanln(&newTitle)
+						errorPanic(err)
+
+						updatable.Title = newTitle
+						db.Save(&updatable)
+						fmt.Println("\nTodo title successfully updated!")
+						break inner
+					case "2":
+						var newDescription string
+						fmt.Println("\nEnter new description:")
+						_, err = fmt.Scanln(&newDescription)
+						errorPanic(err)
+
+						updatable.Description = newDescription
+						db.Save(&updatable)
+						fmt.Println("\nTodo description successfully updated!")
+						break inner
+					case "3":
+						if !updatable.Completed {
+							updatable.Completed = true
+							fmt.Println("\nTodo successfully tagged as completed!")
+						} else {
+							updatable.Completed = false
+							fmt.Println("\nTodo successfully tagged as incomplete!")
+						}
+						db.Save(&updatable)
+						break inner
+					}
+
 				}
 			}
 		}
